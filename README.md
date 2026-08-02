@@ -26,7 +26,7 @@ Sometimes you want your Function to be generic over an effect.
 For example, maybe you're writing an API client and you want to support
 both sync and async*, without having to implement the auth flow twice.
 
-Or you've written a program that makes use of GPIO pins, and now want to write tests that can run, without you having to fiddle with the hardware.
+Or you've written a program that makes use of GPIO pins, and now want to write tests that can run without you having to fiddle with the hardware.
 
 In both cases, you could have your function yield an effect when it needs to do IO, and let the caller handle those effects as appropriate.
 
@@ -50,7 +50,7 @@ This is a form of dependency inversion and this style of programming is also cal
 Rewriting a typical computation (method) with a bunch of control flow and other effects into this style
 would normally require you to hand-write a large and unwieldy state-machine.
 
-Thankfully Dart does this already for us, when we write sync* (and async*) generators.
+Thankfully Dart does this already for us when we write sync* (and async*) generators.
 Missing only is really the ability to continue with a value.
 
 The only thing this library then does is provide some wrappers that only advance
