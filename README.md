@@ -75,6 +75,8 @@ const like = 'sample';
 
 ## Additional information
 
-TODO: Tell users more about the package: where to find more information, how to
-contribute to the package, how to file issues, what response they can expect
-from the package authors, and more.
+I've written this with the goal to refactor my [Db Migrations with Multiverse Time Travel](https://github.com/benthillerkus/db_migrations_with_multiverse_time_travel) packge to be sync / async agnostic.
+
+This is 100% slop free, hand-made, ethically sourced etc. and all mistakes are of my own.
+
+I did afterwards ask Gemini to help me with the naming of some types to be correct with FP literature and the results where ... mixed. So if here's something that claims to be something it's not, please do tell; I'd gladly correct it.
