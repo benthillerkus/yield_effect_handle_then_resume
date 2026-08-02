@@ -1,5 +1,4 @@
-// ignore_for_file: public_member_api_docs
-
+/// Using the received [T], update the locals inside your [Computation].
 typedef SetState<T> = void Function(T arg);
 
 /// Function that is called to resume the computation with a value of type [T].
@@ -12,6 +11,8 @@ typedef BindState = Continuation<T> Function<T>(SetState<T> callback);
 typedef Computation<E extends BaseEffect> =
     Iterable<E> Function(BindState receive);
 
+/// Wraps an [Iterable] of [BaseEffect]s so that it can only advance
+/// to the next yield, when the [BaseEffect] has been handled.
 Iterable<E> co<E extends BaseEffect>(Computation<E> constructor) sync* {
   late void Function(void _) advance;
   // ignore: prefer_function_declarations_over_variables
@@ -26,12 +27,35 @@ Iterable<E> co<E extends BaseEffect>(Computation<E> constructor) sync* {
   var movedNext = iterator.moveNext();
   advance = (_) => movedNext = iterator.moveNext();
   while (movedNext) {
+    // TODO throw when the effect has not been handled
     yield iterator.current;
   }
 }
 
+/// Subclass your own effects as such
+/// ```dart
+/// class GetUser extends BaseEffect {
+///   GetUser(this.id, this.resume);
+///   
+///   final int id;
+/// 
+///   @override
+///   final Continuation<User> resume;
+/// 
+///   @override
+///   // Either no-op or throw an error,
+///   // you don't want to make this mutable.
+///   set resume(Continuation<User> value) {}
+/// }
+/// ```
 abstract class BaseEffect {
+  /// Instance an effect with a [resume] function.
+  /// 
+  /// [resume] receives a value from the effect handler
+  /// which should then be used to update local state.
   const BaseEffect();
 
+  /// Continuation that is called by the effect handler
+  ///  to continue the computation with the provided value.
   abstract covariant Continuation<Never> resume;
 }
