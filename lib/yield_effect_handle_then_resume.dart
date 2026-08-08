@@ -1,13 +1,103 @@
-/// Using the received [T], update the locals inside your [Computation].
+/// # Usage
+///
+/// To make use of this library, you write an effect handler, which can look like this:
+/// ```dart
+/// // drive the computation to the next yield
+/// for (final effect in computation) {
+/// // handle the effect
+///   switch (effect) {
+///     case MyEffect(: final resume):
+///       // do something with effect
+///       print("My effect");
+///       // resume after handling the effect
+///       resume(value);
+///     case AnotherEffect(: final message, : final resume):
+///       print("Another effect: ${message}");
+///       resume(null);
+///   }
+/// }
+/// ```
+///
+/// `computation` is an [Iterable] of [BaseEffect]s, which you can create using the [co] function:
+///
+/// ```dart
+/// final computation = co((then) => sync* {
+///   // if you want to receive a value from the effect handler,
+///   // first declare a place to store it...
+///   late var myState;
+///   // and then assign it inside the [then] callback,
+///   // which will run, before the [Computation] continues from the yield point.
+///   yield MyEffect(then((value) => myState = value));
+///   // so by the time doSomethingWith is called, myState has been assigned.
+///   doSomethingWith(myState);
+///
+///   // if you don't need to receive a value, just pass an empty callback to [then]
+///   yield AnotherEffect("Hello, world!", then((_) {}));
+/// });
+/// ```
+///
+/// Finally each of the effects need to be defined as a subclass of [BaseEffect], which can look like this:
+/// ```dart
+/// sealed class Effect extends BaseEffect {}
+/// class MyEffect extends Effect {
+///   MyEffect(this.message, this.resume);
+///   final String message;
+///   @override
+///   final Continuation<String> resume;
+///
+///   @override
+///   // make sure the setter cannot be used to change the resume function
+///   set resume(Continuation<String> value) {}
+/// }
+///
+/// class AnotherEffect extends Effect {
+///   AnotherEffect(this.message, this.resume);
+///
+///   final String message;
+///
+///   @override
+///   final Continuation<void> resume;
+///   @override
+///   set resume(Continuation<void> value) {}
+/// }
+/// ```
+///
+/// # Explanation
+///
+/// Dart generators like `sync*` already allow you to return (yield) multiple times from the same function,
+/// and also to pause and resume the function at each yield point.
+///
+/// This library makes use of that to additionally allow you to pass values back into the generator.
+///
+/// This is achieved by wrapping the (inner) generator with [co].
+///
+/// Internally, [co] creates an [Iterator] from the generator, and passes the [Iterator.moveNext]
+/// back into the generator.
+///
+/// The generator _then_ yields instances of [BaseEffect] which have been initialized with the [Iterator.moveNext] function
+/// as the [BaseEffect.resume] function.
+///
+/// Inside the handler loop then you are iterating over the wrapped generator made with [co],
+/// which passes through the [BaseEffect]s yielded by the inner generator.
+///
+/// When calling [BaseEffect.resume] you are then effectively calling [Iterator.moveNext] on the inner generator,
+/// which lets the outer generator yield the next [BaseEffect] or finish.
+library;
+
+/// Update the locals inside your [Computation] using the [T] that was passed to [Effect.resume].
+///
+/// Runs before the [Computation] continues from the yield point.
 typedef SetState<T> = void Function(T arg);
 
-/// Function that is called to resume the computation with a value of type [T].
+/// Passes a value back to the [Computation] and then resumes it from the yield point.
+///
+/// Passed into a [BaseEffect] constructor as the [BaseEffect.resume] function.
 typedef Continuation<T> = void Function(T received);
 
-/// [Continuation] bound a function that advances the [Computation] to the next yield point.
+/// _Binds_ a [SetState] callback to a [Continuation] that will be called as [BaseEffect.resume].
 typedef BindState = Continuation<T> Function<T>(SetState<T> callback);
 
-/// Creates a coroutine that yields values of type [E] and can be resumed with values of type [T].
+/// Creates an [Iterable] that must be resumed by calling [E.resume] before it yields the next [E].
 typedef Computation<E extends BaseEffect> = Iterable<E> Function(BindState then);
 
 /// Wraps an [Iterable] of [BaseEffect]s so that it can only advance
@@ -45,12 +135,13 @@ Iterable<E> co<E extends BaseEffect>(Computation<E> constructor) sync* {
   /// Is compared with [setState] in [advance] to prevent
   /// the same [setState] being called more than once,
   /// which indicates that [Effect.resume] was called more than once.
-  /// 
+  ///
   /// See [MultipleResumeException]
   Function? lastSetState;
 
   /// Flips each time an element of this [Iterable] is consumed
   bool ping = false;
+
   /// Flips each time [Effect.resume] is called.
   bool pong = true;
   advance = (setState) {
@@ -67,31 +158,22 @@ Iterable<E> co<E extends BaseEffect>(Computation<E> constructor) sync* {
 }
 
 /// Exception thrown when [Effect.resume] is called more than once.
-/// 
-/// In some programming languages this is actually a feature, which is really cool,
-/// but it's not really possible to emulate this in Dart.
-/// Everything I can think of would more or less
-/// be just programming in continuation-passing style.
 class MultipleResumeException implements Exception {
   const MultipleResumeException._();
 }
 
-/// Exception thrown when [Effect.resume] is never called.
-/// 
-/// Technically not a problem, since the same [Effect]
-/// will just be yielded again, until it is handled.
-/// 
-/// But since that then most likely just ends up
-/// being an infinite loop, this exception is
-/// thrown in as a wrench. 
+/// Exception thrown when [Effect.resume] is not called.
+///
+/// Technically not calling [Effect.resume] is _safe_
+/// in the sense that the same [Effect] is yielded again and
+/// again, until [Effect.resume] is called,
+/// but that's really just an infinite loop.
 class NoResumeException implements Exception {
   const NoResumeException._();
 }
 
 /// Subclass your own effects as such
 /// ```dart
-/// /// Super class of all _your_ effects.
-/// ///
 /// /// Enables exhaustive pattern matching.
 /// sealed class Effect extends BaseEffect {}
 ///
@@ -104,49 +186,47 @@ class NoResumeException implements Exception {
 ///   final Continuation<User> resume;
 ///
 ///   @override
-///   // Either no-op or throw an error,
-///   // you don't want to make this mutable.
+///   // Either no-op or throw an error;
+///   // just make sure [resume] cannot be changed.
 ///   set resume(Continuation<User> value) {}
 /// }
 /// ```
 abstract class BaseEffect {
-  /// Instance an effect with a [resume] function.
+  /// When constructing a [BaseEffect], always pass
+  /// `then((value) => ...)` as the [resume] function
+  /// into the constructor.
   ///
-  /// [resume] sends a value from the effect handler
-  /// to the [Computation] which can then update local state.
-  /// 
-  /// The [Continuation] passed into this should be defined adhoc,
-  /// inside the [BaseEffect.new] constructor, because
-  /// reusing the same [Continuation] on multiple effects
-  /// will trigger the [MultipleResumeException] as a guard
-  /// against calling [resume] more than once.
-  /// 
+  ///
   /// ```
   /// // ok
   /// yield MyEffect(then((value) => doSomething(value)));
-  /// 
+  ///
   /// // also ok
   /// yield AnotherEffect((then(_) {}));
-  /// 
+  ///
   /// // not ok
   /// var counter = 0;
   /// final cont = then(() => counter++);
-  /// 
+  ///
   /// yield MyEffect(cont);
   /// yield MyEffect(cont);
   /// ```
+  ///
+  /// See [MultipleResumeException], [NoResumeException].
   const BaseEffect();
 
-  /// Continuation that is called by the effect handler
-  /// to continue the computation with the provided value.
-  /// 
-  /// Call this exactly **once** when _handling_ the effect.
-  /// 
+  /// Passes a value back to the [Computation] that yielded this [BaseEffect].
+  ///
+  /// The [Computation] will then continue executing
+  /// until it yields the next [BaseEffect] or finishes.
+  ///
+  /// Must be called exactly once.
+  ///
   /// ```dart
   /// // not ok
   /// case MyEffect(: final resume):
   ///   continue;
-  /// 
+  ///
   /// // ok
   /// case InsertDisk(: final diskNr, : final resume):
   ///   print("Please insert disk $diskNr");
@@ -154,13 +234,13 @@ abstract class BaseEffect {
   ///   await io.trayClosed();
   ///   final content = io.read();
   ///   resume(content);
-  /// 
+  ///
   /// // not ok
   /// case GetInput(: final resume):
   ///   resume("hi");
   ///   resume("hello");
   /// ```
-  /// 
+  ///
   /// See [MultipleResumeException], [NoResumeException]
   abstract covariant Continuation<Never> resume;
 }
