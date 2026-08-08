@@ -25,6 +25,10 @@ linter:
     - public_member_api_docs
     - unnecessary_nullable_for_final_variable_declarations
 
+formatter:
+  page_width: 100
+  trailing_commas: preserve
+
 analyzer:
   language:
     strict-casts: true

@@ -8,24 +8,23 @@ typedef Continuation<T> = void Function(T received);
 typedef BindState = Continuation<T> Function<T>(SetState<T> callback);
 
 /// Creates a coroutine that yields values of type [E] and can be resumed with values of type [T].
-typedef Computation<E extends BaseEffect> =
-    Iterable<E> Function(BindState then);
+typedef Computation<E extends BaseEffect> = Iterable<E> Function(BindState then);
 
 /// Wraps an [Iterable] of [BaseEffect]s so that it can only advance
 /// to the next yield, when the [BaseEffect] has been handled.
-/// 
+///
 /// ```dart
 /// final doNothing = co((then) => sync* {
 ///   yield Noop(then((_){});
 /// });
 /// ```
-/// 
+///
 /// ```dart
 /// /// Probably looks just like this in the GitHub source code 🙃
 /// final loadIssueComments = co((then) => sync* {
 ///   late final List<Comment> discussion;
 ///   yield GetDiscussion(issueId, pagination, then((list) => discussion = list));
-///   if (Random.nextInt(10) < 9) { // 90% uptime 
+///   if (Random.nextInt(10) < 9) { // 90% uptime
 ///     yield Respond(discussion, then((_){}));
 ///   }
 /// });
@@ -95,15 +94,15 @@ class NoResumeException implements Exception {
 /// ///
 /// /// Enables exhaustive pattern matching.
 /// sealed class Effect extends BaseEffect {}
-/// 
+///
 /// class GetUser extends Effect {
 ///   GetUser(this.id, this.resume);
-///   
+///
 ///   final int id;
-/// 
+///
 ///   @override
 ///   final Continuation<User> resume;
-/// 
+///
 ///   @override
 ///   // Either no-op or throw an error,
 ///   // you don't want to make this mutable.
