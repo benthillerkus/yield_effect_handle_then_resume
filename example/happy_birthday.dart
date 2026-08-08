@@ -53,8 +53,6 @@ final class GetInstant extends Effect {
 
   @override
   final Continuation<DateTime> resume;
-  @override
-  set resume(Continuation<DateTime> _) {}
 }
 
 final class GetFriend extends Effect {
@@ -64,22 +62,14 @@ final class GetFriend extends Effect {
 
   @override
   final Continuation<Friend> resume;
-  @override
-  set resume(Continuation<Friend> _) {}
 }
-
-typedef GetFriendsListFn = void Function(List<FriendId> friends);
 
 final class GetFriendsList extends Effect {
   const GetFriendsList(this.resume);
 
   @override
-  final GetFriendsListFn resume;
-  @override
-  set resume(GetFriendsListFn _) {}
+  final Continuation<List<FriendId>> resume;
 }
-
-typedef SendMessageFn = void Function(bool confirmation);
 
 final class SendMessage extends Effect {
   const SendMessage(this.message, this.resume);
@@ -87,9 +77,7 @@ final class SendMessage extends Effect {
   final String message;
 
   @override
-  final SendMessageFn resume;
-  @override
-  set resume(SendMessageFn _) {}
+  final Continuation<bool> resume;
 }
 
 extension type FriendId(int id) {}

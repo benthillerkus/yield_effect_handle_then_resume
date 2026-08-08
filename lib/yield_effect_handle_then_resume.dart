@@ -44,10 +44,6 @@
 ///   final String message;
 ///   @override
 ///   final Continuation<String> resume;
-///
-///   @override
-///   // make sure the setter cannot be used to change the resume function
-///   set resume(Continuation<String> value) {}
 /// }
 ///
 /// class AnotherEffect extends Effect {
@@ -57,8 +53,6 @@
 ///
 ///   @override
 ///   final Continuation<void> resume;
-///   @override
-///   set resume(Continuation<void> value) {}
 /// }
 /// ```
 ///
@@ -83,6 +77,8 @@
 /// When calling [BaseEffect.resume] you are then effectively calling [Iterator.moveNext] on the inner generator,
 /// which lets the outer generator yield the next [BaseEffect] or finish.
 library;
+
+import 'package:meta/meta.dart';
 
 /// Update the locals inside your [Computation] using the [T] that was passed to [Effect.resume].
 ///
@@ -119,6 +115,7 @@ typedef Computation<E extends BaseEffect> = Iterable<E> Function(BindState then)
 ///   }
 /// });
 /// ```
+@useResult
 Iterable<E> co<E extends BaseEffect>(Computation<E> constructor) sync* {
   late void Function(Function setState) advance;
   // ignore: prefer_function_declarations_over_variables
@@ -184,11 +181,6 @@ class NoResumeException implements Exception {
 ///
 ///   @override
 ///   final Continuation<User> resume;
-///
-///   @override
-///   // Either no-op or throw an error;
-///   // just make sure [resume] cannot be changed.
-///   set resume(Continuation<User> value) {}
 /// }
 /// ```
 abstract class BaseEffect {
@@ -242,5 +234,7 @@ abstract class BaseEffect {
   /// ```
   ///
   /// See [MultipleResumeException], [NoResumeException]
-  abstract covariant Continuation<Never> resume;
+  @doNotStore
+  @mustBeOverridden
+  abstract final Continuation<Never> resume;
 }

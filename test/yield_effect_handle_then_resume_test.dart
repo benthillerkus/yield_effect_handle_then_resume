@@ -3,15 +3,13 @@ import 'package:yield_effect_handle_then_resume/yield_effect_handle_then_resume.
 
 sealed class Effect extends BaseEffect {}
 
-class Print extends Effect {
+final class Print extends Effect {
   Print(this.message, this.resume);
 
   final String message;
 
   @override
   final Continuation<void> resume;
-  @override
-  set resume(Continuation<void> value) {}
 }
 
 void main() {
