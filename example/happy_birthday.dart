@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:yield_effect_handle_then_resume/yield_effect_handle_then_resume.dart';
 
 final kevin = Friend(id: FriendId(0), name: "Kevin", birthday: DateTime(1995, 5, 26));
@@ -8,18 +10,26 @@ final myFriends = [bob, alice, stuart, kevin];
 
 void main() {
   var i = 0;
+  final random = Random();
   for (final effect in wishHappyBirthday) {
     print("${i++} current effect: $effect");
     switch (effect) {
-      case GetInstant(:final resume):
-        resume.call(DateTime.now());
-      case GetFriend(:final friendId, :final resume):
-        resume.call(myFriends.where((friend) => friend.id == friendId).first);
-      case GetFriendsList(:final resume):
-        resume.call(myFriends.map((friend) => friend.id).toList());
-      case SendMessage(:final message, :final resume):
-        print(message);
-        resume.call(true);
+      case GetInstant():
+        effect.success(DateTime.now());
+      case GetFriend(:final friendId):
+        effect.success(myFriends.where((friend) => friend.id == friendId).first);
+      case GetFriendsList():
+        effect.success(myFriends.map((friend) => friend.id).toList());
+      case SendMessage(:final message):
+        if (random.nextDouble() < .3) {
+          print(message);
+          effect.success(null);
+        } else {
+          effect.failure(Exception("Failed to send message"));
+        }
+      case Wait():
+        // await Future.delayed(duration);
+        effect.success(null);
     }
   }
 }
@@ -36,56 +46,67 @@ final wishHappyBirthday = co<Effect>((then) sync* {
     yield GetFriend(id, then((data) => friend = data));
 
     if (friend.birthday.day == today.day && friend.birthday.month == today.month) {
-      yield SendMessage(
-        "Happy Birthday",
-        then((confirmation) => print("Message sent to ${friend.name}: $confirmation")),
-      ); // Retry handling left as an exercise to the reader
+      yield* then.retry<Effect, Exception>(
+        (attempt, error, [stackTrace]) sync* {
+          if (attempt > 5) throw error;
+          final random = Random();
+          var delay = Duration(milliseconds: 100 * pow(2, attempt).ceil());
+          final jitter = Duration(milliseconds: random.nextInt(delay.inMilliseconds ~/ 2));
+          delay = delay ~/2 + jitter;
+          yield Wait(delay, then((_) => print("Retrying to send message to ${friend.name} in $delay")));
+        },
+        (onError) => SendMessage(
+          "Happy Birthday",
+          then((_) => print("Message successfully sent to ${friend.name}")),
+          onError,
+        ),
+      );
     }
   }
 });
 
-sealed class Effect extends BaseEffect {
-  const Effect();
-}
+sealed class const Effect() extends BaseEffect;
 
-final class GetInstant extends Effect {
-  const GetInstant(this.resume);
-
+final class const GetInstant(this.success) extends Effect {
   @override
-  final Continuation<DateTime> resume;
+  final Continuation<DateTime> success;
 }
 
-final class GetFriend extends Effect {
-  const GetFriend(this.friendId, this.resume);
-
+final class const GetFriend(this.friendId, this.success) extends Effect {
   final FriendId friendId;
 
   @override
-  final Continuation<Friend> resume;
+  final Continuation<Friend> success;
 }
 
-final class GetFriendsList extends Effect {
-  const GetFriendsList(this.resume);
-
+final class const GetFriendsList(this.success) extends Effect {
   @override
-  final Continuation<List<FriendId>> resume;
+  final Continuation<List<FriendId>> success;
 }
 
-final class SendMessage extends Effect {
-  const SendMessage(this.message, this.resume);
-
+final class const SendMessage(this.message, this.success, this.failure)
+    extends Effect
+    with Fallible<Exception> {
   final String message;
 
   @override
-  final Continuation<bool> resume;
+  final Continuation<void> success;
+
+  @override
+  final ContinuationFailure<Exception> failure;
 }
 
-extension type FriendId(int id) {}
+final class const Wait(this.duration, this.success) extends Effect {
+  final Duration duration;
 
-class Friend {
-  const Friend({required this.id, required this.name, required this.birthday});
-
-  final FriendId id;
-  final String name;
-  final DateTime birthday;
+  @override
+  final Continuation<void> success;
 }
+
+extension type FriendId(int id);
+
+class const Friend({
+  required final FriendId id,
+  required final String name,
+  required final DateTime birthday,
+});

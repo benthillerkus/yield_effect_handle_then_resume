@@ -4,12 +4,12 @@ import 'package:yield_effect_handle_then_resume/yield_effect_handle_then_resume.
 sealed class Effect extends BaseEffect {}
 
 final class Print extends Effect {
-  Print(this.message, this.resume);
+  Print(this.message, this.success);
 
   final String message;
 
   @override
-  final Continuation<void> resume;
+  final Continuation<void> success;
 }
 
 void main() {
@@ -18,7 +18,7 @@ void main() {
       yield Print("hi", then((_) {}));
     })) {
       switch (effect) {
-        case Print(:final message, :final resume):
+        case Print(:final message, success:final resume):
           print(message);
           resume(null);
           expect(() => resume(null), throwsA(isA<MultipleResumeException>()));

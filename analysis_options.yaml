@@ -21,7 +21,6 @@ linter:
     - await_only_futures
     - unawaited_futures
     - unnecessary_async
-    - unnecessary_await_in_return
     - public_member_api_docs
     - unnecessary_nullable_for_final_variable_declarations
 
